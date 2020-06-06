@@ -1,11 +1,20 @@
 from math import ceil
 
-from PyQt5 import QtGui
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPainter, QPen, QBrush
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QScrollBar, QHBoxLayout
+from PyQt5.QtGui import QPainter, QPen, QBrush, QPixmap, QImage, QPalette, QPaintEvent
+from PyQt5.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QScrollBar,
+    QHBoxLayout,
+    QGraphicsView,
+    QGraphicsScene,
+)
 
 from app import App
+from bitmap_creator import BitmapCreator
+
+_BITMAP_THRESHOLD = 3
 
 
 class BitsWidget(QWidget):
@@ -15,9 +24,22 @@ class BitsWidget(QWidget):
         self._bit_size = bit_size
         self._row_width = row_width
         self._grid_size = grid_size
+        self._one_color = Qt.blue
+        self._zero_color = Qt.white
         self._painting = False
+        self._last_painted_bitmap = None
 
         self._bits_area = QWidget()
+        self._bits_canvas = QGraphicsScene()
+        self._bits_canvas_holder = QGraphicsView(self._bits_canvas)
+        self._bits_canvas_holder.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self._bits_canvas_holder.setBackgroundBrush(
+            QBrush(
+                self._bits_area.palette().color(QPalette.ColorRole.Background),
+                Qt.SolidPattern,
+            )
+        )
+        self._bits_canvas_holder.setStyleSheet("border: 0px")
 
         self._h_scrollbar = QScrollBar(orientation=Qt.Horizontal)
         self._h_scrollbar.setMinimum(0)
@@ -32,6 +54,7 @@ class BitsWidget(QWidget):
         inner_layout.setContentsMargins(0, 0, 0, 0)
         inner_layout.setSpacing(0)
         inner_layout.addWidget(self._bits_area, stretch=1)
+        inner_layout.addWidget(self._bits_canvas_holder, stretch=1)
         inner_layout.addWidget(self._h_scrollbar)
         inner_widget = QWidget()
         inner_widget.setLayout(inner_layout)
@@ -69,11 +92,19 @@ class BitsWidget(QWidget):
 
     @property
     def _bits_area_width(self):
-        return self._bits_area.size().width()
+        return (
+            self._bits_area.width()
+            if self._bit_size > _BITMAP_THRESHOLD
+            else self._bits_canvas_holder.width() - 2
+        )
 
     @property
     def _bits_area_height(self):
-        return self._bits_area.size().height()
+        return (
+            self._bits_area.height()
+            if self._bit_size > _BITMAP_THRESHOLD
+            else self._bits_canvas_holder.height() - 2
+        )
 
     @property
     def _num_rows(self):
@@ -82,10 +113,22 @@ class BitsWidget(QWidget):
     def load_file(self, filename):
         self._app.load_file(filename)
 
-    def paintEvent(self, a0: QtGui.QPaintEvent) -> None:
+    def paintEvent(self, a0: QPaintEvent) -> None:
         super().paintEvent(a0)
         self._painting = True
         self._set_scrollbars()
+        if self._bit_size > _BITMAP_THRESHOLD:
+            self._paint_large_bits()
+        else:
+            self._paint_small_bits()
+
+        self._draw_grid()
+        self._painting = False
+
+    def _paint_large_bits(self):
+        self._bits_canvas_holder.hide()
+        self._bits_area.show()
+
         self._app.draw(
             self._row_width,
             self._h_scrollbar.value(),
@@ -94,18 +137,54 @@ class BitsWidget(QWidget):
             self._bits_area_width // self._bit_size,
             self._draw_bit,
         )
-        self._draw_grid()
-        self._painting = False
+
+    def _paint_small_bits(self):
+        self._bits_area.hide()
+        self._bits_canvas_holder.show()
+
+        visible_columns = self._bits_area_width // self._bit_size
+        visible_rows = self._bits_area_height // self._bit_size
+        bc = BitmapCreator(
+            min(self._row_width * self._bit_size, visible_columns * self._bit_size),
+            min(
+                (self._app.num_bits // self._bit_size) * self._bit_size,
+                visible_rows * self._bit_size,
+            ),
+            self._bit_size,
+        )
+        self._app.draw(
+            self._row_width,
+            self._h_scrollbar.value(),
+            self._v_scrollbar.value(),
+            visible_rows,
+            visible_columns,
+            bc.add_bit,
+        )
+        bitmap = bc.finalize()
+        if bitmap != self._last_painted_bitmap:
+            # Ugly hack to avoid an endless loop of firing the paintEvent of
+            # the bits canvas, which then fires this paintEvent and so on
+            self._draw_bitmap(bitmap, bc.row_width)
+            # TODO: Paint remainder of bits in case all rows are shown and self._num_bits % self._row_width != 0
+            self._last_painted_bitmap = bitmap
 
     def _draw_bit(self, x, y, bit):
         painter = QPainter(self)
         painter.setPen(
             QPen(Qt.black if self._bit_size > 2 else Qt.transparent, 1, Qt.SolidLine)
         )
-        painter.setBrush(QBrush(Qt.blue if bit else Qt.white, Qt.SolidPattern))
+        painter.setBrush(
+            QBrush(self._one_color if bit else self._zero_color, Qt.SolidPattern)
+        )
         painter.drawRect(
             x * self._bit_size, y * self._bit_size, self._bit_size, self._bit_size
         )
+
+    def _draw_bitmap(self, data: bytes, row_width: int):
+        pixmap = self._create_pixmap(data, row_width)
+        self._bits_canvas.clear()
+        self._bits_canvas.setSceneRect(0, 0, pixmap.width(), pixmap.height())
+        self._bits_canvas.addPixmap(pixmap)
 
     def _draw_grid(self):
         if self._grid_size == 0:
@@ -124,6 +203,28 @@ class BitsWidget(QWidget):
         )
         self._draw_h_grid(painter, right, bottom)
         self._draw_v_grid(painter, right, bottom)
+
+    def _create_pixmap(self, data: bytes, row_width: int):
+        pixmap = QPixmap.fromImage(
+            QImage(
+                data,
+                row_width * 8,
+                len(data) // row_width,
+                row_width,
+                QImage.Format_Mono,
+            )
+        )
+        mask = pixmap.createMaskFromColor(Qt.white, Qt.MaskOutColor)
+        p = QPainter(pixmap)
+        p.setPen(self._one_color)
+        p.drawPixmap(pixmap.rect(), mask, mask.rect())
+        p.end()
+        mask = pixmap.createMaskFromColor(Qt.black, Qt.MaskOutColor)
+        p = QPainter(pixmap)
+        p.setPen(self._zero_color)
+        p.drawPixmap(pixmap.rect(), mask, mask.rect())
+        p.end()
+        return pixmap
 
     def _draw_h_grid(self, painter, right, bottom):
         start_offset = -self._h_scrollbar.value() % self._grid_size
