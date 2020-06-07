@@ -14,10 +14,6 @@ class BitmapCreator:
         self._remainder = []
 
     @property
-    def row_width(self):
-        return self._row_width
-
-    @property
     def remainder(self):
         return self._remainder, self._index
 

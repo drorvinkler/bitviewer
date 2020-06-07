@@ -164,7 +164,7 @@ class BitsWidget(QWidget):
         if bitmap != self._last_painted_bitmap:
             # Ugly hack to avoid an endless loop of firing the paintEvent of
             # the bits canvas, which then fires this paintEvent and so on
-            self._draw_bitmap(bitmap, bc.row_width)
+            self._draw_bitmap(bitmap, self._row_width * self._bit_size)
             # TODO: Paint remainder of bits in case all rows are shown and self._num_bits % self._row_width != 0
             self._last_painted_bitmap = bitmap
 
@@ -205,12 +205,13 @@ class BitsWidget(QWidget):
         self._draw_v_grid(painter, right, bottom)
 
     def _create_pixmap(self, data: bytes, row_width: int):
+        byte_width = ceil(row_width / 8)
         pixmap = QPixmap.fromImage(
             QImage(
                 data,
-                row_width * 8,
-                len(data) // row_width,
                 row_width,
+                len(data) // byte_width,
+                byte_width,
                 QImage.Format_Mono,
             )
         )
