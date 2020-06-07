@@ -18,12 +18,16 @@ _BITMAP_THRESHOLD = 3
 
 
 class BitsWidget(QWidget):
-    def __init__(self, bit_size, row_width, grid_size) -> None:
+    def __init__(self, offset, bit_size, row_width, grid_width, grid_height) -> None:
         super().__init__()
         self._app = App()
+        self._offset = offset
         self._bit_size = bit_size
         self._row_width = row_width
-        self._grid_size = grid_size
+        self._grid_width = grid_width
+        self._grid_h_offset = 0
+        self._grid_height = grid_height
+        self._grid_v_offset = 0
         self._one_color = Qt.blue
         self._zero_color = Qt.white
         self._painting = False
@@ -67,6 +71,14 @@ class BitsWidget(QWidget):
         self.setLayout(outer_layout)
 
     @property
+    def offset(self) -> int:
+        return self._offset
+
+    @offset.setter
+    def offset(self, new_offset):
+        self._offset = new_offset
+
+    @property
     def bit_size(self) -> int:
         return self._bit_size
 
@@ -83,12 +95,36 @@ class BitsWidget(QWidget):
         self._row_width = width
 
     @property
-    def grid_size(self) -> int:
-        return self._grid_size
+    def grid_width(self) -> int:
+        return self._grid_width
 
-    @grid_size.setter
-    def grid_size(self, size: int):
-        self._grid_size = size
+    @grid_width.setter
+    def grid_width(self, size: int):
+        self._grid_width = size
+
+    @property
+    def grid_h_offset(self) -> int:
+        return self._grid_h_offset
+
+    @grid_h_offset.setter
+    def grid_h_offset(self, offset: int):
+        self._grid_h_offset = offset
+
+    @property
+    def grid_height(self) -> int:
+        return self._grid_height
+
+    @grid_height.setter
+    def grid_height(self, size: int):
+        self._grid_height = size
+
+    @property
+    def grid_v_offset(self) -> int:
+        return self._grid_v_offset
+
+    @grid_v_offset.setter
+    def grid_v_offset(self, offset: int):
+        self._grid_v_offset = offset
 
     @property
     def _bits_area_width(self):
@@ -108,7 +144,7 @@ class BitsWidget(QWidget):
 
     @property
     def _num_rows(self):
-        return ceil(self._app.num_bits / self._row_width)
+        return ceil((self._app.num_bits - self._offset) / self._row_width)
 
     def load_file(self, filename):
         self._app.load_file(filename)
@@ -130,6 +166,7 @@ class BitsWidget(QWidget):
         self._bits_area.show()
 
         self._app.draw(
+            self._offset,
             self._row_width,
             self._h_scrollbar.value(),
             self._v_scrollbar.value(),
@@ -144,15 +181,14 @@ class BitsWidget(QWidget):
 
         visible_columns = self._bits_area_width // self._bit_size
         visible_rows = self._bits_area_height // self._bit_size
+        num_rows = (self._app.num_bits - self._offset) // self._row_width
         bc = BitmapCreator(
             min(self._row_width * self._bit_size, visible_columns * self._bit_size),
-            min(
-                (self._app.num_bits // self._bit_size) * self._bit_size,
-                visible_rows * self._bit_size,
-            ),
+            min(num_rows * self._bit_size, visible_rows * self._bit_size,),
             self._bit_size,
         )
         self._app.draw(
+            self._offset,
             self._row_width,
             self._h_scrollbar.value(),
             self._v_scrollbar.value(),
@@ -187,7 +223,9 @@ class BitsWidget(QWidget):
         self._bits_canvas.addPixmap(pixmap)
 
     def _draw_grid(self):
-        if self._grid_size == 0:
+        if not self._grid_width and not self._grid_height:
+            return
+        if not self._num_rows:
             return
 
         painter = QPainter(self)
@@ -201,8 +239,10 @@ class BitsWidget(QWidget):
             (self._num_rows - self._v_scrollbar.value()) * self._bit_size,
             self._bits_area_height,
         )
-        self._draw_h_grid(painter, right, bottom)
-        self._draw_v_grid(painter, right, bottom)
+        if self._grid_width:
+            self._draw_h_grid(painter, right, bottom)
+        if self._grid_height:
+            self._draw_v_grid(painter, right, bottom)
 
     def _create_pixmap(self, data: bytes, row_width: int):
         byte_width = ceil(row_width / 8)
@@ -228,15 +268,19 @@ class BitsWidget(QWidget):
         return pixmap
 
     def _draw_h_grid(self, painter, right, bottom):
-        start_offset = -self._h_scrollbar.value() % self._grid_size
+        start_offset = (
+            -self._h_scrollbar.value() % self._grid_width
+        ) + self._grid_h_offset
         start = start_offset * self._bit_size
-        for x in range(start, right + 1, self._grid_size * self._bit_size):
+        for x in range(start, right + 1, self._grid_width * self._bit_size):
             painter.drawLine(x, 0, x, bottom)
 
     def _draw_v_grid(self, painter, right, bottom):
-        start_offset = -self._v_scrollbar.value() % self._grid_size
+        start_offset = (
+            -self._v_scrollbar.value() % self._grid_height
+        ) + self.grid_v_offset
         start = start_offset * self._bit_size
-        for y in range(start, bottom + 1, self._grid_size * self._bit_size):
+        for y in range(start, bottom + 1, self._grid_height * self._bit_size):
             painter.drawLine(0, y, right, y)
 
     def _set_scrollbars(self):

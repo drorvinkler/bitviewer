@@ -21,11 +21,19 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self._header = QWidget()
+        self._offset_spin_box = QSpinBox()
         self._row_width_spin_box = QSpinBox()
         self._bit_size_spin_box = QSpinBox()
-        self._grid_size_spin_box = QSpinBox()
+        self._grid_width_spin_box = QSpinBox()
+        self._grid_h_offset_spin_box = QSpinBox()
+        self._grid_height_spin_box = QSpinBox()
+        self._grid_v_offset_spin_box = QSpinBox()
         self._bits_widget = BitsWidget(
-            _DEFAULT_BIT_SIZE, _DEFAULT_ROW_WIDTH, _DEFAULT_GRID_SIZE
+            0,
+            _DEFAULT_BIT_SIZE,
+            _DEFAULT_ROW_WIDTH,
+            _DEFAULT_GRID_SIZE,
+            _DEFAULT_GRID_SIZE,
         )
 
         self._init_main_window()
@@ -54,6 +62,15 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout()
         layout.setSpacing(5)
 
+        layout.addWidget(QLabel(text="Offset:"))
+        self._offset_spin_box.setMinimum(0)
+        self._offset_spin_box.setMaximum(102400)
+        self._offset_spin_box.setValue(0)
+        self._offset_spin_box.valueChanged.connect(self._on_offset_change)
+        layout.addWidget(self._offset_spin_box)
+
+        layout.addSpacing(10)
+
         layout.addWidget(QLabel(text="Row Width:"))
         self._row_width_spin_box.setMinimum(1)
         self._row_width_spin_box.setMaximum(102400)
@@ -72,26 +89,79 @@ class MainWindow(QMainWindow):
 
         layout.addSpacing(10)
 
-        layout.addWidget(QLabel(text="Grid Size:"))
-        self._grid_size_spin_box.setMinimum(0)
-        self._grid_size_spin_box.setMaximum(10240)
-        self._grid_size_spin_box.setValue(_DEFAULT_GRID_SIZE)
-        self._grid_size_spin_box.valueChanged.connect(self._on_grid_size_change)
-        layout.addWidget(self._grid_size_spin_box)
+        layout.addWidget(QLabel(text="Grid Width:"))
+        self._grid_width_spin_box.setMinimum(0)
+        self._grid_width_spin_box.setMaximum(10240)
+        self._grid_width_spin_box.setValue(_DEFAULT_GRID_SIZE)
+        self._grid_width_spin_box.valueChanged.connect(self._on_grid_width_change)
+        layout.addWidget(self._grid_width_spin_box)
+
+        layout.addSpacing(10)
+
+        layout.addWidget(QLabel(text="Offset:"))
+        self._grid_h_offset_spin_box.setMinimum(0)
+        self._grid_h_offset_spin_box.setMaximum(
+            max(self._grid_width_spin_box.value() - 1, 0)
+        )
+        self._grid_h_offset_spin_box.setValue(0)
+        self._grid_h_offset_spin_box.valueChanged.connect(self._on_grid_h_offset_change)
+        layout.addWidget(self._grid_h_offset_spin_box)
+
+        layout.addSpacing(10)
+
+        layout.addWidget(QLabel(text="Grid Height:"))
+        self._grid_height_spin_box.setMinimum(0)
+        self._grid_height_spin_box.setMaximum(10240)
+        self._grid_height_spin_box.setValue(_DEFAULT_GRID_SIZE)
+        self._grid_height_spin_box.valueChanged.connect(self._on_grid_height_change)
+        layout.addWidget(self._grid_height_spin_box)
+
+        layout.addSpacing(10)
+
+        layout.addWidget(QLabel(text="Offset:"))
+        self._grid_v_offset_spin_box.setMinimum(0)
+        self._grid_v_offset_spin_box.setMaximum(
+            max(self._grid_height_spin_box.value() - 1, 0)
+        )
+        self._grid_v_offset_spin_box.setValue(0)
+        self._grid_v_offset_spin_box.valueChanged.connect(self._on_grid_v_offset_change)
+        layout.addWidget(self._grid_v_offset_spin_box)
 
         layout.addStretch()
         self._header.setLayout(layout)
 
-    def _on_bit_size_change(self):
-        self._bits_widget.bit_size = self._bit_size_spin_box.value()
+    def _on_offset_change(self):
+        self._bits_widget.offset = self._offset_spin_box.value()
         self._bits_widget.repaint()
 
     def _on_row_width_change(self):
         self._bits_widget.row_width = self._row_width_spin_box.value()
         self._bits_widget.repaint()
 
-    def _on_grid_size_change(self):
-        self._bits_widget.grid_size = self._grid_size_spin_box.value()
+    def _on_bit_size_change(self):
+        self._bits_widget.bit_size = self._bit_size_spin_box.value()
+        self._bits_widget.repaint()
+
+    def _on_grid_width_change(self):
+        self._bits_widget.grid_width = self._grid_width_spin_box.value()
+        self._grid_h_offset_spin_box.setMaximum(
+            max(self._grid_width_spin_box.value() - 1, 0)
+        )
+        self._bits_widget.repaint()
+
+    def _on_grid_h_offset_change(self):
+        self._bits_widget.grid_h_offset = self._grid_h_offset_spin_box.value()
+        self._bits_widget.repaint()
+
+    def _on_grid_height_change(self):
+        self._bits_widget.grid_height = self._grid_height_spin_box.value()
+        self._grid_v_offset_spin_box.setMaximum(
+            max(self._grid_height_spin_box.value() - 1, 0)
+        )
+        self._bits_widget.repaint()
+
+    def _on_grid_v_offset_change(self):
+        self._bits_widget.grid_v_offset = self._grid_v_offset_spin_box.value()
         self._bits_widget.repaint()
 
     def _on_open_file(self):

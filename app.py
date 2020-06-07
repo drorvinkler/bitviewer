@@ -21,6 +21,7 @@ class App:
 
     def draw(
         self,
+        offset: int,
         row_width: int,
         start_column: int,
         start_row: int,
@@ -33,7 +34,8 @@ class App:
 
         start = start_row * row_width + start_column
         x = y = 0
-        bits = Bits(self._data, start)
+        bits = Bits(self._data, offset)
+        bits.jump(start)
         for b in bits:
             draw_bit(x, y, b)
             x += 1
