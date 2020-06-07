@@ -1,14 +1,12 @@
 from math import ceil
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPainter, QPen, QBrush, QPixmap, QImage, QPalette, QPaintEvent
+from PyQt5.QtGui import QPainter, QPen, QBrush, QPixmap, QImage, QPaintEvent
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QScrollBar,
     QHBoxLayout,
-    QGraphicsView,
-    QGraphicsScene,
 )
 
 from app import App
@@ -31,19 +29,8 @@ class BitsWidget(QWidget):
         self._one_color = Qt.blue
         self._zero_color = Qt.white
         self._painting = False
-        self._last_painted_bitmap = None
 
         self._bits_area = QWidget()
-        self._bits_canvas = QGraphicsScene()
-        self._bits_canvas_holder = QGraphicsView(self._bits_canvas)
-        self._bits_canvas_holder.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        self._bits_canvas_holder.setBackgroundBrush(
-            QBrush(
-                self._bits_area.palette().color(QPalette.ColorRole.Background),
-                Qt.SolidPattern,
-            )
-        )
-        self._bits_canvas_holder.setStyleSheet("border: 0px")
 
         self._h_scrollbar = QScrollBar(orientation=Qt.Horizontal)
         self._h_scrollbar.setMinimum(0)
@@ -58,7 +45,6 @@ class BitsWidget(QWidget):
         inner_layout.setContentsMargins(0, 0, 0, 0)
         inner_layout.setSpacing(0)
         inner_layout.addWidget(self._bits_area, stretch=1)
-        inner_layout.addWidget(self._bits_canvas_holder, stretch=1)
         inner_layout.addWidget(self._h_scrollbar)
         inner_widget = QWidget()
         inner_widget.setLayout(inner_layout)
@@ -128,19 +114,11 @@ class BitsWidget(QWidget):
 
     @property
     def _bits_area_width(self):
-        return (
-            self._bits_area.width()
-            if self._bit_size > _BITMAP_THRESHOLD
-            else self._bits_canvas_holder.width() - 2
-        )
+        return self._bits_area.width()
 
     @property
     def _bits_area_height(self):
-        return (
-            self._bits_area.height()
-            if self._bit_size > _BITMAP_THRESHOLD
-            else self._bits_canvas_holder.height() - 2
-        )
+        return self._bits_area.height()
 
     @property
     def _num_rows(self):
@@ -162,9 +140,6 @@ class BitsWidget(QWidget):
         self._painting = False
 
     def _paint_large_bits(self):
-        self._bits_canvas_holder.hide()
-        self._bits_area.show()
-
         self._app.draw(
             self._offset,
             self._row_width,
@@ -176,9 +151,6 @@ class BitsWidget(QWidget):
         )
 
     def _paint_small_bits(self):
-        self._bits_area.hide()
-        self._bits_canvas_holder.show()
-
         visible_columns = self._bits_area_width // self._bit_size
         visible_rows = self._bits_area_height // self._bit_size
         num_rows = (self._app.num_bits - self._offset) // self._row_width
@@ -196,13 +168,9 @@ class BitsWidget(QWidget):
             visible_columns,
             bc.add_bit,
         )
-        bitmap = bc.finalize()
-        if bitmap != self._last_painted_bitmap:
-            # Ugly hack to avoid an endless loop of firing the paintEvent of
-            # the bits canvas, which then fires this paintEvent and so on
-            self._draw_bitmap(bitmap, self._row_width * self._bit_size)
-            # TODO: Paint remainder of bits in case all rows are shown and self._num_bits % self._row_width != 0
-            self._last_painted_bitmap = bitmap
+        pixmap = self._create_pixmap(bc.finalize(), self._row_width * self._bit_size)
+        QPainter(self).drawPixmap(0, 0, pixmap)
+        # TODO: Paint remainder of bits in case all rows are shown and self._num_bits % self._row_width != 0
 
     def _draw_bit(self, x, y, bit):
         painter = QPainter(self)
@@ -215,12 +183,6 @@ class BitsWidget(QWidget):
         painter.drawRect(
             x * self._bit_size, y * self._bit_size, self._bit_size, self._bit_size
         )
-
-    def _draw_bitmap(self, data: bytes, row_width: int):
-        pixmap = self._create_pixmap(data, row_width)
-        self._bits_canvas.clear()
-        self._bits_canvas.setSceneRect(0, 0, pixmap.width(), pixmap.height())
-        self._bits_canvas.addPixmap(pixmap)
 
     def _draw_grid(self):
         if not self._grid_width and not self._grid_height:
