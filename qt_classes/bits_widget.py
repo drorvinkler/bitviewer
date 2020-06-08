@@ -1,4 +1,6 @@
+from functools import partial
 from math import ceil
+from typing import cast
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QPen, QBrush, QPixmap, QImage, QPaintEvent, QColor
@@ -9,10 +11,10 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
 )
 
-from app import App
-from bitmap_creator import BitmapCreator
+from app import App, DRAW_BIT_TYPE
 
-_BITMAP_THRESHOLD = 3
+_BITMAP_THRESHOLD = 7
+_BIT_BORDER_THRESHOLD = 2
 
 
 class BitsWidget(QWidget):
@@ -133,6 +135,9 @@ class BitsWidget(QWidget):
 
     def paintEvent(self, a0: QPaintEvent) -> None:
         super().paintEvent(a0)
+        if not self._app.num_bits:
+            return
+
         self._painting = True
         self._set_scrollbars()
         if self._bit_size > _BITMAP_THRESHOLD:
@@ -144,6 +149,8 @@ class BitsWidget(QWidget):
         self._painting = False
 
     def _paint_large_bits(self):
+        painter = QPainter(self)
+        draw_func = cast(DRAW_BIT_TYPE, partial(self._draw_bit, painter))
         self._app.draw(
             self._offset,
             self._row_width,
@@ -151,35 +158,45 @@ class BitsWidget(QWidget):
             self._v_scrollbar.value(),
             self._bits_area_height // self._bit_size,
             self._bits_area_width // self._bit_size,
-            self._draw_bit,
+            draw_func,
         )
+        painter.end()
 
     def _paint_small_bits(self):
         visible_columns = self._bits_area_width // self._bit_size
         visible_rows = self._bits_area_height // self._bit_size
-        num_rows = (self._app.num_bits - self._offset) // self._row_width
-        bc = BitmapCreator(
-            min(self._row_width * self._bit_size, visible_columns * self._bit_size),
-            min(num_rows * self._bit_size, visible_rows * self._bit_size,),
-            self._bit_size,
-        )
-        self._app.draw(
+        bitmap = self._app.create_bitmap(
             self._offset,
             self._row_width,
             self._h_scrollbar.value(),
             self._v_scrollbar.value(),
             visible_rows,
             visible_columns,
-            bc.add_bit,
+            self._bit_size,
         )
-        pixmap = self._create_pixmap(bc.finalize(), self._row_width * self._bit_size)
-        QPainter(self).drawPixmap(0, 0, pixmap)
-        # TODO: Paint remainder of bits in case all rows are shown and self._num_bits % self._row_width != 0
-
-    def _draw_bit(self, x, y, bit):
+        pixmap = self._create_pixmap(bitmap.data, bitmap.width, bitmap.bytes_per_row)
         painter = QPainter(self)
+        painter.drawPixmap(0, 0, pixmap)
+        self._draw_bit_separators(painter, pixmap.width(), pixmap.height())
+        for i, b in enumerate(bitmap.remainder):
+            self._draw_bit(painter, i, pixmap.height() // self._bit_size, b)
+        painter.end()
+
+    def _draw_bit_separators(self, painter: QPainter, right, bottom):
+        if self._bit_size <= _BIT_BORDER_THRESHOLD:
+            return
+
+        painter.setPen(QPen(Qt.black, 1))
+        self._draw_h_grid(painter, right, bottom, 1, 0)
+        self._draw_v_grid(painter, right, bottom, 1, 0)
+
+    def _draw_bit(self, painter: QPainter, x, y, bit):
         painter.setPen(
-            QPen(Qt.black if self._bit_size > 2 else Qt.transparent, 1, Qt.SolidLine)
+            QPen(
+                Qt.black if self._bit_size > _BIT_BORDER_THRESHOLD else Qt.transparent,
+                1,
+                Qt.SolidLine,
+            )
         )
         painter.setBrush(
             QBrush(self._one_color if bit else self._zero_color, Qt.SolidPattern)
@@ -205,33 +222,43 @@ class BitsWidget(QWidget):
             (self._num_rows - self._v_scrollbar.value()) * self._bit_size,
             self._bits_area_height,
         )
-        if self._grid_width:
-            self._draw_h_grid(painter, right, bottom)
-        if self._grid_height:
-            self._draw_v_grid(painter, right, bottom)
-
-    def _create_pixmap(self, data: bytes, row_width: int):
-        byte_width = ceil(row_width / 8)
-        image = QImage(
-            data, row_width, len(data) // byte_width, byte_width, QImage.Format_Mono
+        self._draw_h_grid(
+            painter,
+            right,
+            bottom,
+            self._grid_width,
+            self._grid_h_offset - self._h_scrollbar.value(),
         )
+        self._draw_v_grid(
+            painter,
+            right,
+            bottom,
+            self._grid_height,
+            self._grid_v_offset - self._v_scrollbar.value(),
+        )
+
+    def _create_pixmap(self, data: bytes, width, bytes_per_row: int):
+        height = len(data) // bytes_per_row
+        image = QImage(data, width, height, bytes_per_row, QImage.Format_Mono)
         image.setColorTable(self._color_table)
         return QPixmap.fromImage(image)
 
-    def _draw_h_grid(self, painter, right, bottom):
-        start_offset = (
-            -self._h_scrollbar.value() % self._grid_width
-        ) + self._grid_h_offset
+    def _draw_h_grid(self, painter, right, bottom, grid_width, grid_offset):
+        if not grid_width:
+            return
+
+        start_offset = grid_offset % grid_width
         start = start_offset * self._bit_size
-        for x in range(start, right + 1, self._grid_width * self._bit_size):
+        for x in range(start, right + 1, grid_width * self._bit_size):
             painter.drawLine(x, 0, x, bottom)
 
-    def _draw_v_grid(self, painter, right, bottom):
-        start_offset = (
-            -self._v_scrollbar.value() % self._grid_height
-        ) + self.grid_v_offset
+    def _draw_v_grid(self, painter, right, bottom, grid_height, grid_offset):
+        if not grid_height:
+            return
+
+        start_offset = grid_offset % grid_height
         start = start_offset * self._bit_size
-        for y in range(start, bottom + 1, self._grid_height * self._bit_size):
+        for y in range(start, bottom + 1, grid_height * self._bit_size):
             painter.drawLine(0, y, right, y)
 
     def _set_scrollbars(self):

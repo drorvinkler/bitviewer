@@ -3,6 +3,10 @@ Changelog
 
 0.3.0 (2020-06-07)
 -------------------
+- Improved performance
+
+0.3.0 (2020-06-07)
+-------------------
 - Fixed a bug where extra columns of zeros would be added in small bit sizes.
 - Added an option to see the bit starting from a certain offset.
 - Separated the grid size control to grid width and grid height.
