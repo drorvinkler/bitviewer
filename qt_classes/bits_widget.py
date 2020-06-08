@@ -3,7 +3,16 @@ from math import ceil
 from typing import cast
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPainter, QPen, QBrush, QPixmap, QImage, QPaintEvent, QColor
+from PyQt5.QtGui import (
+    QPainter,
+    QPen,
+    QBrush,
+    QPixmap,
+    QImage,
+    QPaintEvent,
+    QColor,
+    QWheelEvent,
+)
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -299,6 +308,17 @@ class BitsWidget(QWidget):
     def _calc_v_scrollbar_max(self):
         visible_rows = self._bits_area_height // self.bit_size
         return self._num_rows - visible_rows
+
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        y_delta = event.angleDelta().y()
+        if y_delta:
+            notches = ceil(y_delta / 120)
+            self._v_scrollbar.setValue(self._v_scrollbar.value() - notches)
+
+        x_delta = event.angleDelta().x()
+        if x_delta:
+            notches = ceil(x_delta / 120)
+            self._h_scrollbar.setValue(self._h_scrollbar.value() - notches)
 
     def _on_scrollbar_change(self):
         if not self._painting:

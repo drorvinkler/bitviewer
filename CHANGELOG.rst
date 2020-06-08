@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.5.0 (2020-06-08)
+-------------------
+- Improved performance
+- Keyboard shortcut to open file
+- Scrolling using the mouse wheel is now supported
+
 0.4.0 (2020-06-08)
 -------------------
 - Improved performance
