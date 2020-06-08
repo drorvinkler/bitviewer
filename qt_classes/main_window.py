@@ -55,6 +55,7 @@ class MainWindow(QMainWindow):
 
     def _create_menu(self):
         open_file = QAction(text="&Open", parent=self)
+        open_file.setShortcut("Ctrl+O")
         open_file.triggered.connect(self._on_open_file)
         self.menuBar().addMenu("&File").addAction(open_file)
 
