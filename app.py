@@ -68,14 +68,12 @@ class App:
         bytes_per_row = ceil(bits_per_row / 8)
         result = []
         for _ in range(num_rows):
-            for _ in range(bit_size):
-                result.extend(self._get_row_bytes(start, bytes_per_row))
+            result.extend(self._get_row_bytes(start, bytes_per_row) * bit_size)
             start += row_width
         remainder = []
         last_byte = min(start // 8 + bytes_per_row, len(self._data))
         if last_byte < len(self._data):
-            for _ in range(bit_size):
-                result.extend(self._get_row_bytes(start, bytes_per_row))
+            result.extend(self._get_row_bytes(start, bytes_per_row) * bit_size)
         else:
             remainder = self._get_end_bits(start)
         result = bytes(b for ob in result for b in self._replicate_byte(ob, bit_size))
@@ -123,4 +121,4 @@ class App:
 
     @staticmethod
     def _byte_to_bits(b):
-        return [bool(b & 2 ** i) for i in range(7, -1, -1)]
+        return [bool((b >> i) & 1) for i in range(7, -1, -1)]
