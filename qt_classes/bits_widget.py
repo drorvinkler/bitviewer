@@ -232,8 +232,9 @@ class BitsWidget(QWidget):
         height = len(data) // bytes_per_row
         image = QImage(data, width, height, bytes_per_row, QImage.Format_Mono)
         image.setColorTable(self._color_table)
-        image = image.scaled(width * self._bit_size, height * self._bit_size)
-        return QPixmap.fromImage(image)
+        return QPixmap.fromImage(image).scaled(
+            width * self._bit_size, height * self._bit_size
+        )
 
     def _draw_h_grid(self, painter, right, bottom, grid_width, grid_offset):
         if not grid_width:
