@@ -1,7 +1,7 @@
 from math import ceil
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPainter, QPen, QBrush, QPixmap, QImage, QPaintEvent
+from PyQt5.QtGui import QPainter, QPen, QBrush, QPixmap, QImage, QPaintEvent, QColor
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -28,6 +28,10 @@ class BitsWidget(QWidget):
         self._grid_v_offset = 0
         self._one_color = Qt.blue
         self._zero_color = Qt.white
+        self._color_table = [
+            QColor(self._zero_color).rgb(),
+            QColor(self._one_color).rgb(),
+        ]
         self._painting = False
 
         self._bits_area = QWidget()
@@ -208,26 +212,11 @@ class BitsWidget(QWidget):
 
     def _create_pixmap(self, data: bytes, row_width: int):
         byte_width = ceil(row_width / 8)
-        pixmap = QPixmap.fromImage(
-            QImage(
-                data,
-                row_width,
-                len(data) // byte_width,
-                byte_width,
-                QImage.Format_Mono,
-            )
+        image = QImage(
+            data, row_width, len(data) // byte_width, byte_width, QImage.Format_Mono
         )
-        mask = pixmap.createMaskFromColor(Qt.white, Qt.MaskOutColor)
-        p = QPainter(pixmap)
-        p.setPen(self._one_color)
-        p.drawPixmap(pixmap.rect(), mask, mask.rect())
-        p.end()
-        mask = pixmap.createMaskFromColor(Qt.black, Qt.MaskOutColor)
-        p = QPainter(pixmap)
-        p.setPen(self._zero_color)
-        p.drawPixmap(pixmap.rect(), mask, mask.rect())
-        p.end()
-        return pixmap
+        image.setColorTable(self._color_table)
+        return QPixmap.fromImage(image)
 
     def _draw_h_grid(self, painter, right, bottom):
         start_offset = (
