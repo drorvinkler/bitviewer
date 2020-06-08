@@ -1,6 +1,4 @@
-from functools import partial
 from math import ceil
-from typing import cast
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import (
@@ -20,9 +18,8 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
 )
 
-from app import App, DRAW_BIT_TYPE
+from app import App
 
-_BITMAP_THRESHOLD = 7
 _BIT_BORDER_THRESHOLD = 2
 
 
@@ -149,29 +146,12 @@ class BitsWidget(QWidget):
 
         self._painting = True
         self._set_scrollbars()
-        if self._bit_size > _BITMAP_THRESHOLD:
-            self._paint_large_bits()
-        else:
-            self._paint_small_bits()
+        self._paint_bits()
 
         self._draw_grid()
         self._painting = False
 
-    def _paint_large_bits(self):
-        painter = QPainter(self)
-        draw_func = cast(DRAW_BIT_TYPE, partial(self._draw_bit, painter))
-        self._app.draw(
-            self._offset,
-            self._row_width,
-            self._h_scrollbar.value(),
-            self._v_scrollbar.value(),
-            self._bits_area_height // self._bit_size,
-            self._bits_area_width // self._bit_size,
-            draw_func,
-        )
-        painter.end()
-
-    def _paint_small_bits(self):
+    def _paint_bits(self):
         visible_columns = self._bits_area_width // self._bit_size
         visible_rows = self._bits_area_height // self._bit_size
         bitmap = self._app.create_bitmap(
@@ -181,14 +161,12 @@ class BitsWidget(QWidget):
             self._v_scrollbar.value(),
             visible_rows,
             visible_columns,
-            self._bit_size,
         )
         pixmap = self._create_pixmap(bitmap.data, bitmap.width, bitmap.bytes_per_row)
         painter = QPainter(self)
         painter.drawPixmap(0, 0, pixmap)
         self._draw_bit_separators(painter, pixmap.width(), pixmap.height())
-        for i, b in enumerate(bitmap.remainder):
-            self._draw_bit(painter, i, pixmap.height() // self._bit_size, b)
+        self._draw_last_row_of_bits(painter, bitmap.remainder, pixmap)
         painter.end()
 
     def _draw_bit_separators(self, painter: QPainter, right, bottom):
@@ -199,7 +177,7 @@ class BitsWidget(QWidget):
         self._draw_h_grid(painter, right, bottom, 1, 0)
         self._draw_v_grid(painter, right, bottom, 1, 0)
 
-    def _draw_bit(self, painter: QPainter, x, y, bit):
+    def _draw_last_row_of_bits(self, painter, last_row_of_bits, pixmap):
         painter.setPen(
             QPen(
                 Qt.black if self._bit_size > _BIT_BORDER_THRESHOLD else Qt.transparent,
@@ -207,6 +185,10 @@ class BitsWidget(QWidget):
                 Qt.SolidLine,
             )
         )
+        for i, b in enumerate(last_row_of_bits):
+            self._draw_bit(painter, i, pixmap.height() // self._bit_size, b)
+
+    def _draw_bit(self, painter: QPainter, x, y, bit):
         painter.setBrush(
             QBrush(self._one_color if bit else self._zero_color, Qt.SolidPattern)
         )
@@ -250,6 +232,7 @@ class BitsWidget(QWidget):
         height = len(data) // bytes_per_row
         image = QImage(data, width, height, bytes_per_row, QImage.Format_Mono)
         image.setColorTable(self._color_table)
+        image = image.scaled(width * self._bit_size, height * self._bit_size)
         return QPixmap.fromImage(image)
 
     def _draw_h_grid(self, painter, right, bottom, grid_width, grid_offset):

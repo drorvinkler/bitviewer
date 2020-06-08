@@ -1,6 +1,10 @@
 Changelog
 =========
 
+1.0.0 (2020-06-08)
+-------------------
+- Huge performance improvement
+
 0.5.0 (2020-06-08)
 -------------------
 - Improved performance

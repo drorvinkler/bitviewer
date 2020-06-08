@@ -1,11 +1,7 @@
-from functools import reduce
-from math import ceil, log
-from typing import Callable, Optional, List
+from math import ceil
+from typing import Optional, List
 
 from bitmap import Bitmap
-from bits import Bits
-
-DRAW_BIT_TYPE = Callable[[int, int, bool], None]
 
 
 class App:
@@ -22,33 +18,6 @@ class App:
         with open(filename, "rb") as f:
             self._data = f.read(max_bytes)
 
-    def draw(
-        self,
-        offset: int,
-        row_width: int,
-        start_column: int,
-        start_row: int,
-        visible_rows: int,
-        visible_columns: int,
-        draw_bit: DRAW_BIT_TYPE,
-    ):
-        if self._data is None:
-            return
-
-        start = start_row * row_width + start_column
-        x = y = 0
-        bits = Bits(self._data, offset)
-        bits.jump(start)
-        for b in bits:
-            draw_bit(x, y, b)
-            x += 1
-            if x + start_column >= row_width or x > visible_columns:
-                x = 0
-                y += 1
-                bits.jump((y + start_row) * row_width + start_column)
-            if y > visible_rows:
-                break
-
     def create_bitmap(
         self,
         offset: int,
@@ -57,7 +26,6 @@ class App:
         start_row: int,
         visible_rows: int,
         visible_columns: int,
-        bit_size: int,
     ) -> Optional[Bitmap]:
         if self._data is None:
             return
@@ -68,18 +36,15 @@ class App:
         bytes_per_row = ceil(bits_per_row / 8)
         result = []
         for _ in range(num_rows):
-            result.extend(self._get_row_bytes(start, bytes_per_row) * bit_size)
+            result.extend(self._get_row_bytes(start, bytes_per_row))
             start += row_width
         remainder = []
-        last_byte = min(start // 8 + bytes_per_row, len(self._data))
+        last_byte = start // 8 + bytes_per_row
         if last_byte < len(self._data):
-            result.extend(self._get_row_bytes(start, bytes_per_row) * bit_size)
+            result.extend(self._get_row_bytes(start, bytes_per_row))
         else:
             remainder = self._get_end_bits(start)
-        result = bytes(b for ob in result for b in self._replicate_byte(ob, bit_size))
-        return Bitmap(
-            result, bits_per_row * bit_size, bytes_per_row * bit_size, remainder
-        )
+        return Bitmap(bytes(result), bits_per_row, bytes_per_row, remainder)
 
     def _get_row_bytes(self, start, num_bytes) -> list:
         i, bi = start // 8, start % 8
@@ -96,28 +61,6 @@ class App:
     def _get_end_bits(self, start) -> List[bool]:
         i, bi = start // 8, start % 8
         return [bit for byte in self._data[i:] for bit in self._byte_to_bits(byte)][bi:]
-
-    @classmethod
-    def _replicate_byte(cls, b: int, n: int) -> list:
-        n -= 1
-        if not n:
-            return [b]
-
-        masks = [cls._move(0xF, n + 1), cls._move(0x3, n + 1), cls._move(1, n + 1)]
-        spaced = b
-        spaced = (spaced ^ (spaced << (4 * n))) & masks[0]
-        spaced = (spaced ^ (spaced << (2 * n))) & masks[1]
-        spaced = (spaced ^ (spaced << n)) & masks[2]
-        replicated = reduce(lambda x, i: x | (spaced << i), range(n + 1), 0)
-        return [(replicated >> (8 * i)) & 0xFF for i in range(n, -1, -1)]
-
-    @classmethod
-    def _move(cls, n, m):
-        base = int(log(n + 1, 2))
-        result = n
-        for i in range(8 // base - 1):
-            result = (result << (m * base)) | n
-        return result
 
     @staticmethod
     def _byte_to_bits(b):
