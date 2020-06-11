@@ -1,5 +1,5 @@
 from math import ceil
-from typing import Optional, List
+from typing import Optional, List, Iterable
 
 from bitmap import Bitmap
 
@@ -34,29 +34,28 @@ class App:
         num_rows = min(ceil((self.num_bits - start) / row_width), visible_rows + 1) - 1
         bits_per_row = min(row_width, visible_columns)
         bytes_per_row = ceil(bits_per_row / 8)
+        mask = 2 ** (bytes_per_row * 8) - 1
         result = []
         for _ in range(num_rows):
-            result.extend(self._get_row_bytes(start, bytes_per_row))
+            result.extend(self._get_row_bytes(start, bytes_per_row, mask))
             start += row_width
         remainder = []
         last_byte = start // 8 + bytes_per_row
         if last_byte < len(self._data):
-            result.extend(self._get_row_bytes(start, bytes_per_row))
+            result.extend(self._get_row_bytes(start, bytes_per_row, mask))
         else:
             remainder = self._get_end_bits(start)
         return Bitmap(bytes(result), bits_per_row, bytes_per_row, remainder)
 
-    def _get_row_bytes(self, start, num_bytes) -> list:
+    def _get_row_bytes(self, start, num_bytes, mask) -> Iterable[int]:
         i, bi = start // 8, start % 8
         if not bi:
             return self._data[i : i + num_bytes]
 
-        h_mask = 2 ** (8 - bi) - 1
-        l_mask = 2 ** 8 - h_mask - 1
-        pairs = zip(
-            self._data[i : i + num_bytes], self._data[i + 1 : i + num_bytes + 1]
-        )
-        return [((h & h_mask) << bi) + ((l & l_mask) >> (8 - bi)) for h, l in pairs]
+        return (
+            (int.from_bytes(self._data[i : i + num_bytes + 1], "big") >> (8 - bi))
+            & mask
+        ).to_bytes(num_bytes, "big")
 
     def _get_end_bits(self, start) -> List[bool]:
         i, bi = start // 8, start % 8
