@@ -1,3 +1,7 @@
+import json
+from dataclasses import asdict
+from os.path import exists
+
 from PyQt5.QtWidgets import (
     QMainWindow,
     QVBoxLayout,
@@ -10,15 +14,22 @@ from PyQt5.QtWidgets import (
 )
 
 from qt_classes.bits_widget import BitsWidget
+from qt_classes.settings_dialog import SettingsDialog
+from settings import Settings
+
+_SETTINGS_FILE = "settings.json"
 
 _DEFAULT_BIT_SIZE = 10
 _DEFAULT_ROW_WIDTH = 80
 _DEFAULT_GRID_SIZE = 0
+_MAX_BIT_SIZE = 100
 
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
+        self._settings_dialog = SettingsDialog(self, _MAX_BIT_SIZE)
+        self._init_settings()
 
         self._header = QWidget()
         self._offset_spin_box = QSpinBox()
@@ -34,10 +45,12 @@ class MainWindow(QMainWindow):
             _DEFAULT_ROW_WIDTH,
             _DEFAULT_GRID_SIZE,
             _DEFAULT_GRID_SIZE,
+            self._settings_dialog.min_bit_size_borders - 1,
         )
 
         self._init_main_window()
         self._create_menu()
+
         self.show()
 
     def _init_main_window(self):
@@ -57,7 +70,23 @@ class MainWindow(QMainWindow):
         open_file = QAction(text="&Open", parent=self)
         open_file.setShortcut("Ctrl+O")
         open_file.triggered.connect(self._on_open_file)
-        self.menuBar().addMenu("&File").addAction(open_file)
+
+        settings = QAction(text="&Setting", parent=self)
+        settings.triggered.connect(self._open_settings)
+
+        file_menu = self.menuBar().addMenu("&File")
+        file_menu.addAction(open_file)
+        file_menu.addAction(settings)
+
+    def _init_settings(self):
+        if exists(_SETTINGS_FILE):
+            settings = self._load_settings()
+        else:
+            settings = Settings()
+            self._save_settings(settings)
+
+        self._settings_dialog.max_bytes = settings.max_bytes
+        self._settings_dialog.min_bit_size_borders = settings.bit_borders_start
 
     def _init_header(self):
         layout = QHBoxLayout()
@@ -83,7 +112,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(QLabel(text="Bit Size:"))
         self._bit_size_spin_box.setMinimum(1)
-        self._bit_size_spin_box.setMaximum(100)
+        self._bit_size_spin_box.setMaximum(_MAX_BIT_SIZE)
         self._bit_size_spin_box.setValue(_DEFAULT_BIT_SIZE)
         self._bit_size_spin_box.valueChanged.connect(self._on_bit_size_change)
         layout.addWidget(self._bit_size_spin_box)
@@ -170,5 +199,30 @@ class MainWindow(QMainWindow):
         if not filename:
             return
 
-        self._bits_widget.load_file(filename)
+        self._bits_widget.load_file(filename, self._settings_dialog.max_bytes)
         self._bits_widget.repaint()
+
+    def _open_settings(self):
+        accepted = self._settings_dialog.exec()
+        if accepted:
+            settings = Settings(
+                max_bytes=self._settings_dialog.max_bytes,
+                bit_borders_start=self._settings_dialog.min_bit_size_borders,
+            )
+            self._bits_widget.set_bit_border_threshold(settings.bit_borders_start - 1)
+            self._save_settings(settings)
+        else:
+            settings = self._load_settings()
+            self._settings_dialog.max_bytes = settings.max_bytes
+            self._settings_dialog.min_bit_size_borders = settings.bit_borders_start
+
+    @staticmethod
+    def _load_settings():
+        with open(_SETTINGS_FILE) as f:
+            settings = Settings(**json.load(f))
+        return settings
+
+    @staticmethod
+    def _save_settings(settings):
+        with open(_SETTINGS_FILE, "w") as f:
+            json.dump(asdict(settings), f, indent=2)

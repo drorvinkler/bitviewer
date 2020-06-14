@@ -20,11 +20,11 @@ from PyQt5.QtWidgets import (
 
 from app import App
 
-_BIT_BORDER_THRESHOLD = 2
-
 
 class BitsWidget(QWidget):
-    def __init__(self, offset, bit_size, row_width, grid_width, grid_height) -> None:
+    def __init__(
+        self, offset, bit_size, row_width, grid_width, grid_height, bit_border_threshold
+    ) -> None:
         super().__init__()
         self._app = App()
         self._offset = offset
@@ -40,6 +40,7 @@ class BitsWidget(QWidget):
             QColor(self._zero_color).rgb(),
             QColor(self._one_color).rgb(),
         ]
+        self._bit_border_threshold = bit_border_threshold
         self._painting = False
 
         self._bits_area = QWidget()
@@ -136,8 +137,11 @@ class BitsWidget(QWidget):
     def _num_rows(self):
         return ceil((self._app.num_bits - self._offset) / self._row_width)
 
-    def load_file(self, filename):
-        self._app.load_file(filename)
+    def set_bit_border_threshold(self, threshold):
+        self._bit_border_threshold = threshold
+
+    def load_file(self, filename, max_bytes):
+        self._app.load_file(filename, max_bytes)
 
     def paintEvent(self, a0: QPaintEvent) -> None:
         super().paintEvent(a0)
@@ -170,7 +174,7 @@ class BitsWidget(QWidget):
         painter.end()
 
     def _draw_bit_separators(self, painter: QPainter, right, bottom):
-        if self._bit_size <= _BIT_BORDER_THRESHOLD:
+        if self._bit_size <= self._bit_border_threshold:
             return
 
         painter.setPen(QPen(Qt.black, 1))
@@ -180,7 +184,9 @@ class BitsWidget(QWidget):
     def _draw_last_row_of_bits(self, painter, last_row_of_bits, pixmap):
         painter.setPen(
             QPen(
-                Qt.black if self._bit_size > _BIT_BORDER_THRESHOLD else Qt.transparent,
+                Qt.black
+                if self._bit_size > self._bit_border_threshold
+                else Qt.transparent,
                 1,
                 Qt.SolidLine,
             )

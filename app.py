@@ -13,8 +13,7 @@ class App:
     def num_bits(self):
         return len(self._data) * 8 if self._data is not None else 0
 
-    def load_file(self, filename):
-        max_bytes = 10 ** 6
+    def load_file(self, filename, max_bytes):
         with open(filename, "rb") as f:
             self._data = f.read(max_bytes)
 

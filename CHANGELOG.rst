@@ -1,23 +1,27 @@
 Changelog
 =========
 
+1.2.0 (2020-06-15)
+-------------------
+- Added settings.
+
 1.1.0 (2020-06-11)
 -------------------
-- Performance improvement
+- Performance improvement.
 
 1.0.0 (2020-06-08)
 -------------------
-- Huge performance improvement
+- Huge performance improvement.
 
 0.5.0 (2020-06-08)
 -------------------
-- Improved performance
-- Keyboard shortcut to open file
-- Scrolling using the mouse wheel is now supported
+- Improved performance.
+- Keyboard shortcut to open file.
+- Scrolling using the mouse wheel is now supported.
 
 0.4.0 (2020-06-08)
 -------------------
-- Improved performance
+- Improved performance.
 
 0.3.0 (2020-06-07)
 -------------------
