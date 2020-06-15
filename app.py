@@ -34,7 +34,7 @@ class App:
         bits_per_row = min(row_width, visible_columns)
         bytes_per_row = ceil(bits_per_row / 8)
         mask = 2 ** (bytes_per_row * 8) - 1
-        result = []
+        result = bytearray()
         for _ in range(num_rows):
             result.extend(self._get_row_bytes(start, bytes_per_row, mask))
             start += row_width
@@ -44,7 +44,7 @@ class App:
             result.extend(self._get_row_bytes(start, bytes_per_row, mask))
         else:
             remainder = self._get_end_bits(start)
-        return Bitmap(bytes(result), bits_per_row, bytes_per_row, remainder)
+        return Bitmap(result, bits_per_row, bytes_per_row, remainder)
 
     def _get_row_bytes(self, start, num_bytes, mask) -> Iterable[int]:
         i, bi = start // 8, start % 8
