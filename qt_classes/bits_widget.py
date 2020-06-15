@@ -10,6 +10,7 @@ from PyQt5.QtGui import (
     QPaintEvent,
     QColor,
     QWheelEvent,
+    QMouseEvent,
 )
 from PyQt5.QtWidgets import (
     QWidget,
@@ -41,6 +42,7 @@ class BitsWidget(QWidget):
             QColor(self._one_color).rgb(),
         ]
         self._bit_border_threshold = bit_border_threshold
+        self._easter_egg = 0
         self._painting = False
 
         self._bits_area = QWidget()
@@ -309,6 +311,32 @@ class BitsWidget(QWidget):
         if x_delta:
             notches = ceil(x_delta / 120)
             self._h_scrollbar.setValue(self._h_scrollbar.value() - notches)
+
+    def mousePressEvent(self, a0: QMouseEvent) -> None:
+        if (
+            a0.x() <= self._bit_size
+            and a0.y() <= self._bit_size
+            and self._easter_egg < 9
+        ):
+            self._easter_egg += 1
+        elif (
+            self._bit_size <= a0.x() <= self._bit_size * 2
+            and self._bit_size <= a0.y() <= self._bit_size * 2
+            and 9 <= self._easter_egg < 12
+        ):
+            self._easter_egg += 1
+        elif (
+            self._bit_size * 2 <= a0.x() <= self._bit_size * 3
+            and self._bit_size * 2 <= a0.y() <= self._bit_size * 3
+            and self._easter_egg == 12
+        ):
+            tmp = self._one_color
+            self._one_color = self._zero_color
+            self._zero_color = tmp
+            self._color_table = [self._color_table[1], self._color_table[0]]
+            self._easter_egg = 0
+        else:
+            self._easter_egg = 0
 
     def _on_scrollbar_change(self):
         if not self._painting:

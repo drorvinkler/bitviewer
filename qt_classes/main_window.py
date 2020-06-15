@@ -18,18 +18,15 @@ from qt_classes.settings_dialog import SettingsDialog
 from settings import Settings
 
 _SETTINGS_FILE = "settings.json"
-
-_DEFAULT_BIT_SIZE = 10
-_DEFAULT_ROW_WIDTH = 80
-_DEFAULT_GRID_SIZE = 0
 _MAX_BIT_SIZE = 100
 
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
+        settings = self._load_settings()
         self._settings_dialog = SettingsDialog(self, _MAX_BIT_SIZE)
-        self._init_settings()
+        self._init_settings(settings)
 
         self._header = QWidget()
         self._offset_spin_box = QSpinBox()
@@ -41,19 +38,19 @@ class MainWindow(QMainWindow):
         self._grid_v_offset_spin_box = QSpinBox()
         self._bits_widget = BitsWidget(
             0,
-            _DEFAULT_BIT_SIZE,
-            _DEFAULT_ROW_WIDTH,
-            _DEFAULT_GRID_SIZE,
-            _DEFAULT_GRID_SIZE,
+            settings.bit_size,
+            settings.row_width,
+            0,
+            0,
             self._settings_dialog.min_bit_size_borders - 1,
         )
 
-        self._init_main_window()
+        self._init_main_window(settings.row_width, settings.bit_size, 0, 0)
         self._create_menu()
 
         self.show()
 
-    def _init_main_window(self):
+    def _init_main_window(self, row_width, bit_size, grid_width, grid_height):
         self.setWindowTitle("Bit Viewer")
         self.setGeometry(100, 100, 500, 500)
         root = QWidget()
@@ -61,7 +58,7 @@ class MainWindow(QMainWindow):
 
         layout = QVBoxLayout()
         layout.setSpacing(0)
-        self._init_header()
+        self._init_header(row_width, bit_size, grid_width, grid_height)
         layout.addWidget(self._header)
         layout.addWidget(self._bits_widget, stretch=1)
         root.setLayout(layout)
@@ -78,17 +75,11 @@ class MainWindow(QMainWindow):
         file_menu.addAction(open_file)
         file_menu.addAction(settings)
 
-    def _init_settings(self):
-        if exists(_SETTINGS_FILE):
-            settings = self._load_settings()
-        else:
-            settings = Settings()
-            self._save_settings(settings)
-
+    def _init_settings(self, settings):
         self._settings_dialog.max_bytes = settings.max_bytes
         self._settings_dialog.min_bit_size_borders = settings.bit_borders_start
 
-    def _init_header(self):
+    def _init_header(self, row_width, bit_size, grid_width, grid_height):
         layout = QHBoxLayout()
         layout.setSpacing(5)
 
@@ -104,7 +95,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel(text="Row Width:"))
         self._row_width_spin_box.setMinimum(1)
         self._row_width_spin_box.setMaximum(102400)
-        self._row_width_spin_box.setValue(_DEFAULT_ROW_WIDTH)
+        self._row_width_spin_box.setValue(row_width)
         self._row_width_spin_box.valueChanged.connect(self._on_row_width_change)
         layout.addWidget(self._row_width_spin_box)
 
@@ -113,7 +104,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel(text="Bit Size:"))
         self._bit_size_spin_box.setMinimum(1)
         self._bit_size_spin_box.setMaximum(_MAX_BIT_SIZE)
-        self._bit_size_spin_box.setValue(_DEFAULT_BIT_SIZE)
+        self._bit_size_spin_box.setValue(bit_size)
         self._bit_size_spin_box.valueChanged.connect(self._on_bit_size_change)
         layout.addWidget(self._bit_size_spin_box)
 
@@ -122,7 +113,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel(text="Grid Width:"))
         self._grid_width_spin_box.setMinimum(0)
         self._grid_width_spin_box.setMaximum(10240)
-        self._grid_width_spin_box.setValue(_DEFAULT_GRID_SIZE)
+        self._grid_width_spin_box.setValue(grid_width)
         self._grid_width_spin_box.valueChanged.connect(self._on_grid_width_change)
         layout.addWidget(self._grid_width_spin_box)
 
@@ -142,7 +133,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel(text="Grid Height:"))
         self._grid_height_spin_box.setMinimum(0)
         self._grid_height_spin_box.setMaximum(10240)
-        self._grid_height_spin_box.setValue(_DEFAULT_GRID_SIZE)
+        self._grid_height_spin_box.setValue(grid_height)
         self._grid_height_spin_box.valueChanged.connect(self._on_grid_height_change)
         layout.addWidget(self._grid_height_spin_box)
 
@@ -216,8 +207,21 @@ class MainWindow(QMainWindow):
             self._settings_dialog.max_bytes = settings.max_bytes
             self._settings_dialog.min_bit_size_borders = settings.bit_borders_start
 
+    def closeEvent(self, a0) -> None:
+        settings = Settings(
+            max_bytes=self._settings_dialog.max_bytes,
+            bit_borders_start=self._settings_dialog.min_bit_size_borders,
+            row_width=self._bits_widget.row_width,
+            bit_size=self._bits_widget.bit_size,
+        )
+        self._save_settings(settings)
+        super().closeEvent(a0)
+
     @staticmethod
     def _load_settings():
+        if not exists(_SETTINGS_FILE):
+            return Settings()
+
         with open(_SETTINGS_FILE) as f:
             settings = Settings(**json.load(f))
         return settings

@@ -1,6 +1,11 @@
 Changelog
 =========
 
+1.3.0 (2020-06-16)
+-------------------
+- Minor performance improvement.
+- Saving row width and bit size between runs.
+
 1.2.0 (2020-06-15)
 -------------------
 - Added settings.
